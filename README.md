@@ -1,4 +1,6 @@
 # BFCache Explainer
+Authors: @rakina, @domenic, @fergald - Google
+
 ## What is BFCache?
 BFCache (back-forward cache) is a user agent feature that allows user agents to keep a document alive in the back-forward cache after the user navigates away from it. Later on, if the user navigates back to that document, the user agent can use the previously cached document instead of re-loading a new document from scratch.
 
