@@ -36,7 +36,7 @@ By providing good bfcache-related guidelines for new API authors to consider and
 *   **User agent implementation varies quite a lot especially in eligibility/ineligibility/eviction policy, as they’re not specified**
     *   This makes it hard for web authors to predict whether their pages can be bfcached. While it's acceptable for some behaviour to be unspecifieded, currently, for any given decision, it's unclear if it's unspecified because implementations are free to choose or because it has just never been considered. This makes it hard to write WPTs.
     *   Example: Previously some user agents support pages with "unload” handlers but others didn’t. It was [recently specified](https://github.com/whatwg/html/pull/5889).
-*   **Many existing APIs were not written with BFCache in mind, in particular that::**
+*   **Many existing APIs were not written with BFCache in mind, in particular that:**
     *   Documents are not always discarded after navigation, and may retain state after navigations.
     *   A document might transition into an "inactive” state but not be discarded, and should essentially be treated as not there (not show up in various APIs, not receive updates including deferred ones)
 *   **It’s hard to retrofit APIs to work well with bfcache, especially when considering compatibility**
@@ -70,7 +70,7 @@ What to add to [Web Platform Design Principles](https://w3ctag.github.io/design-
         *   While web authors can manually release the resources/sever connections from within the "pagehide” event and restore them from the "pageshow” event themselves, doing this automatically from the API design would reduce the bfcache-support overhead
         *   **Examples:**
             *   APIs that hold non-exclusive resources may be able release the resource when the document becomes not fully active, and re-acquire them when it becomes "fully active” again (Screen Wake Lock API is already [doing](https://w3c.github.io/screen-wake-lock/#handling-document-loss-of-full-activity) the first part).
-                *   Note that this might not be appropriate for all types of resources, e.g. if an exclusive lock is held, we cannot just release it and reacquire when 'fully active" since another page could then take that lock. If there is an API to signal to the page that this has happened, it may be acceptable but beware that if the only time this happens is with BFCache, then it's likely many pages are not prepared for it. If it is not possible to support BFCache, follow the "Make non-’fully active’ documents unsalvageable for situations that can’t be supported” pattern described below.
+                *   Note that this might not be appropriate for all types of resources, e.g. if an exclusive lock is held, we cannot just release it and reacquire when 'fully active" since another page could then take that lock. If there is an API to signal to the page that this has happened, it may be acceptable but beware that if the only time this happens is with BFCache, then it's likely many pages are not prepared for it. If it is not possible to support BFCache, follow the "Discard non-’fully active’ documents for situations that can’t be supported” pattern described below.
             *   APIs that create live connections can pause/close the connection and possibly resume/reopen it later.
         *   Additionally, when a document becomes "fully active” again, it can be useful to update it with the current state of the world, if anything has changed while it is in the non-”fully active” state.
         *   Care needs to be taken with events that occurred while in the BFCache. When not ”fully active”, for some cases, all events should be dropped, in others the latest state should be delivered in a single event, in others it may be appropriate to queue events or deliver a combined event. The correct approach is case by case and should consider privacy, correctnes, performance and ergonomics. Examples:
@@ -83,12 +83,12 @@ What to add to [Web Platform Design Principles](https://w3ctag.github.io/design-
         *   Examples:
             *   [BroadcastChannel](https://html.spec.whatwg.org/multipage/web-messaging.html#broadcasting-to-other-browsing-contexts:fully-active), which checks for "fully active”.
             *   clients.matchAll()'s [spec](https://w3c.github.io/ServiceWorker/#clients-matchall) currently does not distinguish between "fully active” and non-"fully active” clients but correct implementations should only return "fully active” clients
-    *   **Make non-”fully active” documents unsalvageable for situations that can’t be supported**
-        *   If supporting non-”fully active” documents is not possible for certain cases, explicitly specify it by setting the document’s salvageable bit to false. 
+    *   **Discard non-”fully active” documents for situations that can’t be supported**
+        *   If supporting non-"Document/fully active" documents is not possible for certain cases, explicitly specify it by discarding the document if the situation happens after the user navigated away, or setting the document's [salvageable](https://html.spec.whatwg.org/multipage/browsing-the-web.html#concept-document-salvageable) bit to false if the situation happens before or during the navigation away from the document, to cause it to be automatically discarded after navigation.
         *   Note: this should be rare and probably should only be used when retrofitting old APIs, as new APIs should always strive to work well with back-forward cache.
         *   Example:
             *   WebSockets [sets the salvageable bit to false](https://html.spec.whatwg.org/#unloading-documents:concept-document-salvageable-7) during unload.
-            *   [clients.claim()](https://w3c.github.io/ServiceWorker/#clients-claim) should not wait for non-”fully active” clients, instead it should cause the non-”fully active” client documents to be marked as unsalvageable
+            *   [clients.claim()](https://w3c.github.io/ServiceWorker/#clients-claim) should not wait for non-”fully active” clients, instead it should cause the non-”fully active” client documents to be discarded
 *   **Be aware that per-document state/data might persist after navigation**
     *   Example: [sticky user activation](https://html.spec.whatwg.org/multipage/interaction.html#sticky-activation) is [currently specified to stay "forever”](https://github.com/whatwg/html/issues/6588), as it persists across navigations as long as we keep using the same document.
     *   APIs that do not want to keep their state/data after navigation & restore should proactively watch for navigations/lifecycle changes (see the "patterns list” above).
